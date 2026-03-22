@@ -78,7 +78,7 @@ html { overscroll-behavior: none; }
 .hdr-pill{border-radius:12px;padding:3px 7px;font-size:10px;font-weight:800;display:none;}
 #multi-pill{background:linear-gradient(135deg,#6a0080,#9b27af);color:#fff;}
 #speed-pill{background:linear-gradient(135deg,#001a3a,#003a8a);border:1px solid #4080d0;color:#80c0ff;}
-#main{flex:1;overflow:hidden;position:relative;}
+#main{flex:1;overflow:hidden;position:relative;min-height:0;}
 .panel{display:none;height:100%;overflow-y:auto;}
 .panel.active{display:block;}
 #mine-panel{touch-action:pan-y;}
@@ -157,13 +157,19 @@ html { overscroll-behavior: none; }
 .forge-btn:disabled{opacity:0.35;cursor:not-allowed;}
 /* Relic inventory */
 .relic-badge{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#1a1000,#3a2000);border:1px solid #6a4010;border-radius:20px;padding:3px 8px;font-size:9px;font-weight:800;color:#ffaa44;margin:3px;}
-/* NAV */
-#bottom-nav{height:var(--nav-h);overflow:hidden;background:linear-gradient(180deg,#1a1208,#0e0a04);border-top:2px solid #5a3a00;display:flex;align-items:center;flex-shrink:0;z-index:50;}
+/* NAV — fixed en bas, indépendante du flux de contenu */
+#bottom-nav{height:var(--nav-h);overflow:hidden;background:linear-gradient(180deg,#1a1208,#0e0a04);border-top:2px solid #5a3a00;display:flex;align-items:center;flex-shrink:0;z-index:100;
+  position:fixed;bottom:0;left:0;right:0;
+  bottom: max(0px, env(safe-area-inset-bottom));
+}
 .nav-btn{flex:1;height:100%;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--text2);border-top:3px solid transparent;transition:all 0.2s;font-family:'Nunito';}
 .nav-btn .nb-icon{font-size:17px;}.nav-btn .nb-label{font-size:8px;font-weight:700;}
 .nav-btn.active{color:var(--gold);border-top-color:var(--gold);}
 /* Common */
-.sec-panel{padding:10px;}
+/* Fix nav bar : les panels scrollent en interne, jamais en dehors */
+.sec-panel{padding:10px;padding-bottom:calc(var(--nav-h) + 10px);height:100%;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;}
+/* Le body n'a plus besoin de flex pour gérer la nav (elle est fixed) */
+body{padding-bottom:var(--nav-h);}
 .sec-title{font-family:'Boogaloo',cursive;font-size:15px;color:var(--gold2);letter-spacing:1px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #3a2800;}
 .upg-card{background:var(--surface2);border:1px solid #3a2810;border-radius:10px;padding:10px;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
 .upg-icon{font-size:22px;flex-shrink:0;}.upg-body{flex:1;min-width:0;}
@@ -1197,7 +1203,9 @@ function initMiners(id){
   const st=LVL_ST[id],cnt=UPG.minerCount.lvl;
   while(st.miners.length<cnt){
     const idx=st.miners.length;
-    const W2=(ctxMap[id]?.offsetWidth||300);const rS=Math.round(W2*0.27)+30;const startX=rS+idx*30;
+    const W2=(ctxMap[id]?.offsetWidth||300);const stX=Math.round(W2*0.27);
+    const lStart=58,lEnd=stX-20,zW=Math.max(20,Math.floor((lEnd-lStart)/cnt));
+    const startX=lStart+idx*zW+Math.floor(zW/2);
     st.miners.push({x:startX,dir:1,state:'walk',stateTimer:0,pf:0,wp:Math.random()*Math.PI*2,name:NAMES[(id*6+idx)%NAMES.length],idx:idx});
   }
   st.miners.length=cnt;
@@ -1209,11 +1217,11 @@ function tickMiners(id,dt){
   const stoneX=Math.round(W*0.27);
   const zones=[];
   const cnt=UPG.minerCount.lvl;
-  // Divide right space equally between all miners
-  const rStart=stoneX+26, rEnd=W-18;
-  const zoneW=Math.max(30,Math.floor((rEnd-rStart)/cnt));
+  // Divide LEFT space equally between all miners (between elevator col and stone block)
+  const lStart=58, lEnd=stoneX-20;
+  const zoneW=Math.max(20,Math.floor((lEnd-lStart)/cnt));
   for(let mi=0;mi<cnt;mi++){
-    zones.push({s:rStart+mi*zoneW, e:rStart+(mi+1)*zoneW-4});
+    zones.push({s:lStart+mi*zoneW, e:lStart+(mi+1)*zoneW-4});
   }
   const techSpeed=1+getTechBonus('minerSpeedMult');
   st.miners.forEach((m,mi)=>{
@@ -2797,6 +2805,8 @@ function travelToWorld(idx){
   const wi=document.getElementById('world-indicator');
   if(wi)wi.textContent=w.emoji+' '+w.name;
   buildWorldsUI();
+  // ✅ Retour sur l'onglet Mine + la barre de nav reste visible
+  switchTab('mine');
   showToast('🚀 '+w.emoji+' '+w.name+' — Explore-le !');
 }
 function checkWorldComplete(){
